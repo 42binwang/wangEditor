@@ -227,6 +227,22 @@ $.extend($E, {
                 $this.attr(mark, '1');
             }
         });
+    },
+
+    // 为 img 标签增加 max-width
+    'addImgMaxWidth': function ($content) {
+        $content.find('img').each(function(){
+            var $this = $(this),
+                mark = 'wangEditor_img_max_width_mark',
+                markValue = $this.attr(mark);
+            if(!markValue){
+                //没有做标记的进来设置
+                $this.css('max-width', "100%");
+
+                //做一个标记
+                $this.attr(mark, '1');
+            }
+        });
     }
 });
 $.extend($E, {
@@ -324,7 +340,28 @@ $.extend($E, {
         'dropPanel_expression_group': '<div index="{index}" class="clearfix wangEditor-expression-group">{content}</div>',
 
         //视频
-        'videoEmbed': '<embed src="{src}" allowFullScreen="true" quality="high" width="{width}" height="{height}" align="middle" allowScriptAccess="always" type="application/x-shockwave-flash"></embed>',
+        'videoEmbed': [
+            '<object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" ',
+            '        codebase="http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=7,0,0,0" ',
+            '        width="#{width}" ',
+            '        height="#{height}" >',
+            '   <param name="movie" ',
+            '          value="#{vedioUrl}" />',
+            '   <param name="allowFullScreen" value="true" />',
+            '   <param name="allowScriptAccess" value="always" />',
+            '   <param value="transparent" name="wmode" />',
+            '   <embed src="#{vedioUrl}"',
+            '          width="#{width}" ',
+            '          height="#{height}" ',
+            '          name="cc_8E6888CDEA7087C49C33DC5901307461" ',
+            '          allowFullScreen="true" ',
+            '          wmode="transparent" ',
+            '          allowScriptAccess="always" ',
+            '          pluginspage="http://www.macromedia.com/go/getflashplayer" ',
+            '          type="application/x-shockwave-flash"/>',
+            '</object>'
+        ].join(''),
+        
         //代码块
         'codePre': '<pre style="border:1px solid #ccc; background-color: #f5f5f5; padding: 10px; margin: 5px 0px; line-height: 1.4; font-size: 0.8em; font-family: Menlo, Monaco, Consolas; border-radius: 4px; -moz-border-radius: 4px; -webkit-border-radius: 4px;"><code>{content}</code></pre><p><br></p>',
         //代码块（highlight插件）
@@ -341,11 +378,15 @@ $.extend($E, {
     // 在demo页面页面的提醒配置
     'demoAlertConfig': {
         insertExpression: {
-            title: '实际项目中，表情图标要配置到自己的服务器（速度快），请查阅文档。\n\n\n【该弹出框在实际项目中不会出现】',
+            title: '实际项目中，表情图标要配置到自己的服务器（速度快），也可配置多组表情，请查阅文档。\n\n\n【该弹出框在实际项目中不会出现】',
             isAlert: false
         },
         insertImage: {
             title: '实际项目中，可查阅配置文件，如何配置上传本地图片（支持跨域）\n\n\n【该弹出框在实际项目中不会出现】',
+            isAlert: false
+        },
+        insertCode: {
+            title: '实际项目中，可配置高亮代码，请查阅文档\n\n\n【该弹出框在实际项目中不会出现】',
             isAlert: false
         }
     }
@@ -1383,6 +1424,7 @@ $.extend($E.fn, {
             //focus blur 时记录，以便撤销
             editor.addCommandRecord();
         }).on('keyup', function(e){
+            var keyCode = e.keyCode;
             if(e.keyCode === 13){
                 //回车时，记录以下，以便撤销
                 editor.addCommandRecord();
@@ -1445,7 +1487,7 @@ $.extend($E.fn, {
 
         //返回------------------
         return editor;
-    },
+    }
     
 });
 $.extend($E.fn, {
@@ -1810,9 +1852,65 @@ $.extend($E.fn, {
 		var editor = this,
 			$txt = editor.$txt;
 
+		// ----------------------------- // 粘贴文字（去掉样式） -----------------------
+		$txt.on('paste', function(e){
+			var data = e.clipboardData || e.originalEvent.clipboardData;
+			var text;
+
+			if (data == null || data.getData == null) {
+				// 不支持粘贴API
+				return;
+			}
+
+			// 获取内容
+			text = data.getData('text');
+			if (text === '') {
+				return;
+			}
+
+			// 替换html特殊字符
+			text = text.replace(/&/g, '&amp;')
+			           .replace(/</g, '&lt;')
+			           .replace(/>/g, '&gt;')
+			           .replace(/\'/g ,'&#39;')
+			           .replace(/\"/g ,'&quot;')
+			           .replace(/\n/g ,'<br>');
+
+			// 插入内容
+			editor.command(e, 'insertHTML', text);
+
+			// 取消默认行为
+			e.preventDefault();
+		});
+
+		// ----------------------------- // 粘贴（上传）图片 -----------------------
+
+		// 将以base64的图片url数据转换为Blob
+		function convertBase64UrlToBlob(urlData){
+    
+    		//去掉url的头，并转换为byte
+		    var bytes=window.atob(urlData.split(',')[1]);
+		    
+		    //处理异常,将ascii码小于0的转换为大于0
+		    var ab = new ArrayBuffer(bytes.length);
+		    var ia = new Uint8Array(ab);
+		    for (var i = 0; i < bytes.length; i++) {
+		        ia[i] = bytes.charCodeAt(i);
+		    }
+
+		    return new Blob([ab], {type : 'image/png'});
+		}
+
 		$txt.on('paste', function(e){
 			var data = e.clipboardData || e.originalEvent.clipboardData,
-				items = data.items;
+				items;
+
+			if (data == null) {
+				// 兼容IE低版本
+				return;
+			}
+
+			items = data.items;
 
 			$.each(items, function(key, value){
 				if(value.type.indexOf('image') > -1){
@@ -1840,7 +1938,7 @@ $.extend($E.fn, {
 								editor.command(e, 'insertImage', src);
 				            };
 
-				            formData.append('wangEditorPasteFile', base64);
+				            formData.append('wangEditorPasteFile', convertBase64UrlToBlob(base64));
 				            xhr.send(formData);
 						}else{
 							//不上传，则保存为 base64编码
@@ -2273,6 +2371,10 @@ $.extend($E.fn, {
             expressionArr = [],
             i = 1;
 
+        if (path.indexOf('wangeditor.github.io') > 0) {
+            $E.consoleLog('目前的表情图片要访问github.com，速度很慢（可能失败），强烈建议自行配置表情图标！');
+        }
+
         if(editor.expressions){
             //自定义配置的表情图片配置
             expressionArr = editor.expressions;
@@ -2286,8 +2388,10 @@ $.extend($E.fn, {
         //生成dropPanel
         var $panel,
             temp = 
-                '<a href="#" commandValue="${value}">' +   //注意，此处commandValue必填项，否则程序不会跟踪
-                '   <img src="${src}" expression="1"/>' + 
+                //注意，此处commandValue必填项，否则程序不会跟踪
+                '<a href="#" commandValue="${value}">' + 
+                // 菜单点击时，r_src 会替换为 src
+                '   <img r_src="${src}" expression="1"/>' +   
                 '</a>',
             
             //应对一组表情
@@ -2298,7 +2402,8 @@ $.extend($E.fn, {
             tabArr = [],
             tabContainer,
             groupArr = [],
-            groupContainer;
+            groupContainer,
+            triggerClass = this.cssClass;
 
         if( typeof expressionArr[0] === 'string' ){
             //只有一组表情
@@ -2390,6 +2495,21 @@ $.extend($E.fn, {
                 });
             });
         }
+
+        // 点击菜单才加载图标（需等待页面加载完了再绑定事件）
+        $(function () {
+            var $trigger = $('.' + triggerClass).parent();
+            $trigger.on('click.loadImg', function () {
+                $panel.find('img[r_src]').each(function () {
+                    var $img = $(this);
+                    var src = $img.attr('r_src');
+
+                    $img.attr('src', src);
+                    $img.removeAttr('r_src');
+                });
+                $trigger.off('click.loadImg');
+            });
+        });
         
         return $panel; 
     }
@@ -2456,9 +2576,9 @@ $.extend($E.fn, {
             }
 
             embed = $E.htmlTemplates.videoEmbed
-                    .replace('{src}', src)
-                    .replace('{width}', width)
-                    .replace('{height}', height);
+                    .replace(/#{vedioUrl}/ig, src)
+                    .replace(/#{width}/ig, width)
+                    .replace(/#{height}/ig, height);
 
             editor.command(e, 'insertHTML', embed, video_callback);
         });
@@ -2806,6 +2926,8 @@ $.extend($E.fn, {
                 $E.htmlTemplates.modal.replace('{content}', content)
             );
 
+        var triggerClass = this.cssClass;
+
         //地图使用到的变量
         var map,
             markers = [];
@@ -2836,13 +2958,19 @@ $.extend($E.fn, {
             });
         };
 
-        //异步加载 script
+        // 点击菜单加载地图
         $(function(){
-            var ak = 'TVhjYjq1ICT2qqL5LdS8mwas';
-            var script = document.createElement("script");
-            script.type = "text/javascript";
-            script.src = "http://api.map.baidu.com/api?v=2.0&ak=" + ak + "&callback=baiduMapCallBack";  // baiduMapCallBack是一个本地函数
-            document.body.appendChild(script);
+            var $trigger = $('.' + triggerClass).parent();
+            $trigger.on('click.loadMap', function () {
+                var ak = 'TVhjYjq1ICT2qqL5LdS8mwas';
+                var script = document.createElement("script");
+                script.type = "text/javascript";
+                script.src = "http://api.map.baidu.com/api?v=2.0&ak=" + ak + "&callback=baiduMapCallBack";  // baiduMapCallBack是一个本地函数
+                document.body.appendChild(script);
+
+                // 加载完毕，删除加载事件
+                $trigger.off('click.loadMap');
+            });
         });
 
         //搜索位置
@@ -3154,7 +3282,13 @@ $.extend($E.fn, {
         }else{
             //IE8-
             range = document.selection.createRange();
-            range.setEndPoint('EndToEnd', currentRange);
+            try {
+                // 此处，plupload上传上传图片时，IE8-会报一个『参数无效』的错误
+                range.setEndPoint('EndToEnd', currentRange);
+            } catch (ex) {
+
+            }
+            
             if(currentRange.text.length === 0){
                 range.collapse(false);
             }else{
@@ -3216,6 +3350,9 @@ $.extend($E.fn, {
 
             //强制显示table边框
             $E.showTableBorder(this.$txt);
+
+            // img max-width
+            $E.addImgMaxWidth(this.$txt);
 
             //将html保存到textarea
             editor.textareaVal(html);

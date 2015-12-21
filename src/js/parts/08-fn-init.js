@@ -189,6 +189,7 @@ $.extend($E.fn, {
             //focus blur 时记录，以便撤销
             editor.addCommandRecord();
         }).on('keyup', function(e){
+            var keyCode = e.keyCode;
             if(e.keyCode === 13){
                 //回车时，记录以下，以便撤销
                 editor.addCommandRecord();
@@ -251,6 +252,6 @@ $.extend($E.fn, {
 
         //返回------------------
         return editor;
-    },
+    }
     
 });

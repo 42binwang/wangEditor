@@ -2,7 +2,7 @@
 <html>
 <head>
 	<meta charset="UTF-8">
-	<title>wangEditor test</title>
+	<title>wangEditor 跨域上传</title>
 
 	<!--引入wangEditor.css-->
     <link rel="stylesheet" type="text/css" href="../dist/css/wangEditor.css">
@@ -13,10 +13,7 @@
 	<textarea id='textarea1' style='height:200px; max-height:400px; width:100%;'>
 		<p>最简单的demo</p>
 		<p>最简单的demo</p>
-		<blockquote style="color:#999; display:block; border-left: 5px solid #d0e5f2; padding:0 0 0 10px; margin:0; line-height:1.4; font-size: 100%;">
-			默认高度 200px，最大高度 400px
-		</blockquote>
-		<p><br></p>
+
 	</textarea>
 	
 	
@@ -25,7 +22,9 @@
 	<!--<script type="text/javascript" src='../src/js/wangEditor.js'></script>-->
 	<script type="text/javascript">
 		$(function(){
-			var editor = $('#textarea1').wangEditor();
+			var editor = $('#textarea1').wangEditor({
+				uploadUrl: '/uploadXDomain'
+			});
 		});
 	</script>
 </body>
